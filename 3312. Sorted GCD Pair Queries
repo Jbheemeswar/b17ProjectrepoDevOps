@@ -1,0 +1,39 @@
+from bisect import bisect_right
+from collections import Counter
+
+class Solution:
+    def gcdValues(self, nums, queries):
+        mx = max(nums)
+
+        freq = [0] * (mx + 1)
+        for x in nums:
+            freq[x] += 1
+
+        exact = [0] * (mx + 1)
+
+        for d in range(mx, 0, -1):
+            cnt = 0
+            for multiple in range(d, mx + 1, d):
+                cnt += freq[multiple]
+
+            exact[d] = cnt * (cnt - 1) // 2
+
+            for multiple in range(2 * d, mx + 1, d):
+                exact[d] -= exact[multiple]
+
+        prefix = []
+        values = []
+
+        total = 0
+        for d in range(1, mx + 1):
+            if exact[d]:
+                total += exact[d]
+                prefix.append(total)
+                values.append(d)
+
+        ans = []
+        for q in queries:
+            idx = bisect_right(prefix, q)
+            ans.append(values[idx])
+
+        return ans
