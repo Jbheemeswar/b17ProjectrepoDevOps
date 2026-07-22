@@ -1,0 +1,81 @@
+class SparseTable:
+    def __init__(self, nums):
+        self.n = len(nums)
+        if self.n == 0:
+            self.st = []
+            return
+        LOG = self.n.bit_length() + 1
+        self.st = [nums[:]] + [[0] * self.n for _ in range(LOG - 1)]
+        for i in range(1, LOG):
+            prev = self.st[i - 1]
+            cur = self.st[i]
+            span = 1 << i
+            for j in range(self.n - span + 1):
+                cur[j] = max(prev[j], prev[j + (1 << (i - 1))])
+
+    def query(self, l, r):
+        length = r - l + 1
+        i = length.bit_length() - 1
+        return max(self.st[i][l], self.st[i][r - (1 << i) + 1])
+
+
+class Solution:
+    def maxActiveSectionsAfterTrade(self, s, queries):
+        n = len(s)
+        ones = s.count('1')                 # global count — the answer is "active sections in s",
+                                             # not just within the query slice
+
+        zeroGroups = []                     # [start, length] per maximal run of '0's
+        zeroGroupIndex = [-1] * n
+        for i, ch in enumerate(s):
+            if ch == '0':
+                if i > 0 and s[i - 1] == '0':
+                    zeroGroups[-1][1] += 1
+                else:
+                    zeroGroups.append([i, 1])
+            # defined for EVERY position (not just '0's): index of the most
+            # recently-formed zero group at this point, or -1 if none yet.
+            zeroGroupIndex[i] = len(zeroGroups) - 1
+
+        if not zeroGroups:
+            return [ones] * len(queries)
+
+        mergeLens = [zeroGroups[i][1] + zeroGroups[i + 1][1] for i in range(len(zeroGroups) - 1)]
+        st = SparseTable(mergeLens) if mergeLens else None
+
+        ans = []
+        for l, r in queries:
+            zl, zr = zeroGroupIndex[l], zeroGroupIndex[r]
+
+            left = -1
+            if zl != -1:
+                gs, gl = zeroGroups[zl]
+                left = gl - (l - gs)        # clipped length of l's zero-group, from l onward
+
+            right = -1
+            if zr != -1:
+                gs, gl = zeroGroups[zr]
+                right = r - gs + 1          # clipped length of r's zero-group, up to r
+
+            startAdj = zl + 1
+            endAdj = (zr if s[r] == '1' else zr - 1) - 1
+
+            best = ones
+
+            if s[l] == '0' and s[r] == '0' and zl + 1 == zr:
+                # l's and r's zero-groups are the two flanking a single interior 1-run
+                best = max(best, ones + left + right)
+            elif startAdj <= endAdj and st is not None:
+                # best fully-interior pair of adjacent zero-groups
+                best = max(best, ones + st.query(startAdj, endAdj))
+
+            rightBoundIdx = zr if s[r] == '1' else zr - 1
+            if s[l] == '0' and zl + 1 <= rightBoundIdx and zl + 1 < len(zeroGroups):
+                best = max(best, ones + left + zeroGroups[zl + 1][1])
+
+            if s[r] == '0' and zr - 1 >= 0 and zl < zr - 1:
+                best = max(best, ones + right + zeroGroups[zr - 1][1])
+
+            ans.append(best)
+
+        return ans
